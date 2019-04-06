@@ -1,0 +1,38 @@
+#this Pipline will
+#pullfromSCM, BuildArtifact with maven, push Artifact to Nexus, write and build docker file, then push it to DockerHub.
+
+node {
+   def mvnHome
+   stage('PullfromSCM') {
+      git 'https://github.com/gabytal/java.git'
+   }
+   stage('BuildArtifact') {
+       sh label: '', script: 'sed -i "s/<java.version>.*<\\/java.version>/<java.version>1.7<\\/java.version>/" pom.xml'
+    sh(script: "'/opt/maven/bin/mvn' package", label: 'perform maven package...');
+
+   }
+   stage('pushArtifacttoNexus') {
+nexusArtifactUploader artifacts: [[artifactId: 'time-tracker-web', classifier: '', file: 'web/target/time-tracker-web-0.3.1.war', type: 'war']], credentialsId: 'nexus', groupId: 'gaby', nexusUrl: '172.16.1.101:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'maven', version: '0.2.1'
+   }
+  def app
+  def DOCKER_HUB_USERNAME = "USERNAME"
+  def DOCKER_HUB_PASSWORD = "PASSWORD"
+  def DOCKERHUB_REPO_NAME = "YOUR_REPO"
+  def IMG_NAME = "timetracker"
+
+  stage('write docker file') {
+   
+            writeFile file: "Dockerfile", text: """
+                FROM tomcat:8.0.20-jre8
+                COPY ./web/target/*.war /usr/local/tomcat/webapps/
+            """
+            sh "docker build -t ${IMG_NAME}:${env.BUILD_ID} ."
+  }
+    stage('push to docker hub') {
+            sh """
+              docker login -u ${DOCKER_HUB_USERNAME} -p ${DOCKER_HUB_PASSWORD}
+              docker tag ${IMG_NAME}:${env.BUILD_ID} ${DOCKERHUB_REPO_NAME}:latest
+            """
+            sh "docker push ${DOCKERHUB_REPO_NAME}:latest"
+        }
+  }
