@@ -1,0 +1,26 @@
+#this pipeline build Java based application from git repo, then send the Artifact to Nexus,
+#then put the file on remote host's folder and reboot the machine.
+node {
+   def mvnHome
+   stage('PullfromSCM') {
+      git 'https://github.com/gabytal/java.git'
+   }
+   stage('BuildArtifact') {
+       sh label: '', script: 'sed -i "s/<java.version>.*<\\/java.version>/<java.version>1.7<\\/java.version>/" pom.xml'
+    sh(script: "'/opt/maven/bin/mvn' package", label: 'perform maven package...');
+
+   }
+   stage('Results') {
+nexusArtifactUploader artifacts: [[artifactId: 'time-tracker-web', classifier: '', file: 'web/target/time-tracker-web-0.3.1.war', type: 'war']], credentialsId: 'nexus', groupId: 'gaby', nexusUrl: '172.16.1.101:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'maven', version: '0.2.1'
+   }
+    def remote = [:]
+  remote.name = 'webservercilab'
+  remote.host = '172.16.1.109'
+  remote.user = 'root'
+  remote.password = 'PASSWORD'
+  remote.allowAnyHosts = true
+  stage('Remote SSH') {
+    sshPut remote: remote, from: 'web/target/time-tracker-web-0.3.1.war', into: '/opt/tomcat/.', override: true
+    sshCommand remote: remote, command: "sudo reboot"
+ }
+}
