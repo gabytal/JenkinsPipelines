@@ -1,6 +1,3 @@
-#this Pipline will
-#pullfromSCM, BuildArtifact with maven, push Artifact to Nexus, write and build docker file, then push it to DockerHub.
-
 node {
    def mvnHome
    stage('PullfromSCM') {
@@ -15,9 +12,9 @@ node {
 nexusArtifactUploader artifacts: [[artifactId: 'time-tracker-web', classifier: '', file: 'web/target/time-tracker-web-0.3.1.war', type: 'war']], credentialsId: 'nexus', groupId: 'gaby', nexusUrl: '172.16.1.101:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'maven', version: '0.2.1'
    }
   def app
-  def DOCKER_HUB_USERNAME = "USERNAME"
-  def DOCKER_HUB_PASSWORD = "PASSWORD"
-  def DOCKERHUB_REPO_NAME = "YOUR_REPO"
+  def DOCKER_HUB_USERNAME = "gabytal333"
+  def DOCKER_HUB_PASSWORD = "aaa55aaa"
+  def DOCKERHUB_REPO_NAME = "gabytal333/gabyrepo"
   def IMG_NAME = "timetracker"
 
   stage('write docker file') {
@@ -28,10 +25,11 @@ nexusArtifactUploader artifacts: [[artifactId: 'time-tracker-web', classifier: '
             """
             sh "docker build -t ${IMG_NAME}:${env.BUILD_ID} ."
   }
-    stage('push to docker hub') {
+    stage('run docker container and push to docker hub') {
             sh """
               docker login -u ${DOCKER_HUB_USERNAME} -p ${DOCKER_HUB_PASSWORD}
               docker tag ${IMG_NAME}:${env.BUILD_ID} ${DOCKERHUB_REPO_NAME}:latest
+              docker run -d -p 8888:8080 --name ${IMG_NAME} ${DOCKERHUB_REPO_NAME}:latest
             """
             sh "docker push ${DOCKERHUB_REPO_NAME}:latest"
         }
