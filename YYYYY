@@ -1,0 +1,56 @@
+node {
+     properties([parameters([
+              choice(choices: ['Tomcat_docker_container_8888', 'Deploy_by_SSH'], description: 'to use the Deploy_by_SSH, please configure the host in the variables', name: 'Deploy to'),
+                  choice(choices: ['develop', 'master'], description: '', name: 'barnchName'),
+                  string(defaultValue: 'yatosh', description: '', name: 'artifactName', trim: false)
+                  ])])
+   stage('Preparation') {
+     
+      if (barnchName=="master"){
+   git 'https://github.com/zivkashtan/course.git'
+} else {
+   git 'https://github.com/zivkashtan/develop/course.git'
+      }
+   }
+   stage('Build') {
+	  def mvnHome=tool name: '3.6.0', type: 'maven'
+      def pomData=readMavenPom file: ''
+      def pomVersion= pomData.version
+      def FinalArtifactVersion = pomVersion.substring(0, pomVersion.lastIndexOf('.'))+'.'+env.BUILD_ID
+      def FinalArtifactName = artifactName
+
+      if (barnchName=="develop"){
+  echo "###DEVELOP"
+  sh "'${mvnHome}/bin/mvn' -Dmaven.test.failure.ignore clean package"
+} else {
+  echo "###MASTER"
+  sh "'${mvnHome}/bin/mvn' clean package"
+      }
+	  writeFile file: "Dockerfile", text: """
+			FROM tomcat:8.0.20-jre8
+			COPY ./web/target/*.war /usr/local/tomcat/webapps/${artifactName}.war
+		"""
+   }
+withDockerRegistry(credentialsId: 'nexus', url: 'http://172.16.1.101:8123/repository/docker-gaby/') { 
+}
+		sh """
+		  docker build -t ${artifactName}:${env.BUILD_ID} .
+		  docker tag ${artifactName}:${env.BUILD_ID} 172.16.1.101:8123/repository/docker-gaby/${artifactName}:${env.BUILD_ID}
+		  docker push 172.16.1.101:8123/repository/docker-gaby/${artifactName}:${env.BUILD_ID}
+		"""
+      }
+       stage('Deploy') {
+          if (Deploy to=="Tomcat_docker_container_8888"){
+            "sh  docker run -d -p 8888:8080 --name ${artifactName}-${env.BUILD_ID} 172.16.1.101:8123/repository/docker-gaby/${artifactName}:${env.BUILD_ID}"
+   } else {
+  def remote = [:]
+  remote.name = 'webservercilab'
+  remote.host = '172.16.1.109'
+  remote.user = 'root'
+  remote.password = 'PASSWORD'
+  remote.allowAnyHosts = true
+  stage('Remote SSH') {
+    sshPut remote: remote, from: 'web/target/time-tracker-web-0.3.1.war', into: '/opt/tomcat/.', override: true
+    sshCommand remote: remote, command: "sudo reboot"
+ }
+}
