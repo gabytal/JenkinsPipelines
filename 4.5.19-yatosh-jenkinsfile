@@ -1,3 +1,7 @@
+#README
+#first, ask the user if it's the master branch or develop,
+#Pull from Git, build the prject with Maven, write Dockerfile, push the docker IMG to registry
+
 node {
     properties([parameters([
         choice(choices: ['develop', 'master'], description: '', name: 'barnchName'),
