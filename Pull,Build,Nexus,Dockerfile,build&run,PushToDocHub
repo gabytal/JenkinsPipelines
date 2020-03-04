@@ -1,3 +1,7 @@
+#README
+#this piple will Pull the code from GIT,
+#Build with Maven, push to Nexus, write Dockerfile, build & run it ,then Push To Docker Hub
+
 node {
    def mvnHome
    stage('PullfromSCM') {
